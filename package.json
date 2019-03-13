@@ -17,6 +17,7 @@
     "typescript": "^3.3.3333"
   },
   "scripts": {
+    "prepublishOnly": "npm run build",
     "prebuild": "tslint -c tslint.json -p tsconfig.json --fix",
     "build": "tsc",
     "prestart": "npm run build",
