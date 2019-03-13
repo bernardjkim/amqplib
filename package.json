@@ -1,5 +1,5 @@
 {
-  "name": "amqplib",
+  "name": "@bernardjkim/amqplib",
   "version": "1.0.0",
   "description": "amqplib wrapper",
   "main": "index.js",
