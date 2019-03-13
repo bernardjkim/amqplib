@@ -4,9 +4,17 @@
   "description": "amqplib wrapper",
   "main": "index.js",
   "dependencies": {
-    "amqplib": "^0.5.3"
+    "amqplib": "^0.5.3",
+    "uuid": "^3.3.2",
+    "winston": "^3.2.1"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@types/amqplib": "^0.5.11",
+    "@types/uuid": "^3.4.4",
+    "@types/winston": "^2.4.4",
+    "tslint": "^5.14.0",
+    "typescript": "^3.3.3333"
+  },
   "scripts": {
     "prebuild": "tslint -c tslint.json -p tsconfig.json --fix",
     "build": "tsc",
