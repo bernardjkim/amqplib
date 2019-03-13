@@ -1,0 +1,29 @@
+{
+  "name": "amqplib",
+  "version": "1.0.0",
+  "description": "amqplib wrapper",
+  "main": "index.js",
+  "dependencies": {
+    "amqplib": "^0.5.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "prebuild": "tslint -c tslint.json -p tsconfig.json --fix",
+    "build": "tsc",
+    "prestart": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bernardjkim/amqplib.git"
+  },
+  "keywords": [
+    "amqplib"
+  ],
+  "author": "Bernard Kim",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bernardjkim/amqplib/issues"
+  },
+  "homepage": "https://github.com/bernardjkim/amqplib#readme"
+}
