@@ -23,10 +23,6 @@
     "prestart": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/bernardjkim/amqplib.git"
-  },
   "keywords": [
     "amqplib"
   ],
