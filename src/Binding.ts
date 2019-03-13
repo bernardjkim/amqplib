@@ -10,7 +10,7 @@ const amqpLog = winston.createLogger({
   transports: [new winston.transports.Console()]
 });
 
-export let log = (type: string, message: string) => {
+const log = (type: string, message: string) => {
   amqpLog.log(type, message, { module: "Binding" });
 };
 
