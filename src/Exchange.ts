@@ -1,13 +1,12 @@
-import AMQPLib, { Replies } from "amqplib";
+import { Channel as _Channel, Message as _Message, Options as _Options, Replies as _Replies } from "amqplib";
 import * as Bluebird from "bluebird";
-import { EventEmitter } from "events";
-import uuid from "uuid";
-import winston from "winston";
+import * as uuid from "uuid";
+import * as winston from "winston";
 import { AbstractNode } from "./AbstractNode";
 import { Binding } from "./Binding";
 import { Connection } from "./Connection";
-import { INode, IOptions } from "./INode";
 import { Message } from "./Message";
+import { Node, Options } from "./Node";
 
 // create a custom winston logger for amqp-ts
 const amqpLog = winston.createLogger({
@@ -25,12 +24,12 @@ export class Exchange extends AbstractNode {
   // ===========================================================================
   //  Fields
   // ===========================================================================
-  public _type: string;
+  _type?: string;
 
   // ===========================================================================
   //  Constructor
   // ===========================================================================
-  constructor(connection: Connection, name: string, type?: string, options: IExchangeOptions = {}) {
+  constructor(connection: Connection, name: string, type?: string, options: ExchangeOptions = {}) {
     super(connection, name, options);
     this._type = type;
     this._connection._exchanges[this._name] = this;
@@ -44,7 +43,7 @@ export class Exchange extends AbstractNode {
   /**
    * Initialize Exchange.
    */
-  public _initialize() {
+  _initialize() {
     this.initialized = this._connection.initialized
       .then(() => this._connection._connection.createChannel())
       .then((channel) => this.createReplyQueue(channel))
@@ -56,7 +55,7 @@ export class Exchange extends AbstractNode {
    * @param message    - Message to be sent to exchange
    * @param routingKey - Message routing key
    */
-  public send(message: Message, routingKey = ""): void {
+  send(message: Message, routingKey = ""): void {
     message.sendTo(this, routingKey);
   }
 
@@ -66,13 +65,13 @@ export class Exchange extends AbstractNode {
    * @param routingKey        - Message routing key
    * @returns Promise that fulfills once a response has been received.
    */
-  public rpc(requestParameters: any, routingKey: string = ""): Promise<Message> {
+  rpc(requestParameters: object, routingKey = ""): Promise<Message> {
     return new Promise<Message>((resolve, reject) => {
       /**
        * RPC handler function.
        * @param resultMsg - AMQPlib Message instance
        */
-      const rpcHandler = (resultMsg: AMQPLib.Message) => {
+      const rpcHandler = (resultMsg: _Message) => {
         const result = new Message(resultMsg.content, resultMsg.properties, resultMsg.fields);
         resolve(result);
       };
@@ -95,7 +94,7 @@ export class Exchange extends AbstractNode {
   /**
    * Delete this exchange.
    */
-  public delete(): Promise<void> {
+  delete(): Promise<void> {
     if (this._deleting === undefined) {
       this._deleting = this.initialized
         .then(() => Binding.removeBindingsContaining(this))
@@ -109,7 +108,7 @@ export class Exchange extends AbstractNode {
   /**
    * Close this exchange.
    */
-  public close(): Promise<void> {
+  close(): Promise<void> {
     if (this._closing === undefined) {
       this._closing = this.initialized
         .then(() => Binding.removeBindingsContaining(this))
@@ -127,7 +126,7 @@ export class Exchange extends AbstractNode {
    * @param args    - Args
    * @returns Promise that fulfills once the binding has been initialized.
    */
-  public bind(source: INode, pattern = "", args: any = {}): Promise<Binding> {
+  bind(source: Node, pattern = "", args: object = {}): Promise<Binding> {
     const binding = new Binding(this, source, pattern, args);
     return binding.initialized;
   }
@@ -139,7 +138,7 @@ export class Exchange extends AbstractNode {
    * @param args    - Args
    * @returns Promise that fulfills once the binding has been deleted.
    */
-  public unbind(source: INode, pattern = "", args: any = {}): Promise<void> {
+  unbind(source: Node, pattern = "", args: object = {}): Promise<void> {
     return this._connection._bindings[Binding.id(this, source, pattern)].delete();
   }
 
@@ -151,9 +150,11 @@ export class Exchange extends AbstractNode {
    * Create the reply queue to handle rpc resposne messages.
    * @param channel - AMQPlib Channel instance.
    */
-  private createReplyQueue(channel: AMQPLib.Channel): AMQPLib.Channel {
+  private createReplyQueue(channel: _Channel): _Channel {
     channel.setMaxListeners(0);
-    channel.consume(DIRECT_REPLY_TO_QUEUE, (msg) => channel.emit(msg.properties.correlationId, msg), { noAck: true });
+    channel.consume(DIRECT_REPLY_TO_QUEUE, (msg) => channel.emit(msg ? msg.properties.correlationId : null, msg), {
+      noAck: true
+    });
     return channel;
   }
 
@@ -161,16 +162,16 @@ export class Exchange extends AbstractNode {
    * Create exchange.
    * @param channel - AMQPlib Channel instance.
    */
-  private createExchange(channel: AMQPLib.Channel): Promise<IInitializeResult> {
+  private createExchange(channel: _Channel): Promise<InitializeResult> {
     this._channel = channel;
 
-    const initializeExchange: Bluebird<Replies.Empty> = this._options.noCreate
+    const initializeExchange: Bluebird<_Replies.Empty> = this._options.noCreate
       ? channel.checkExchange(this._name)
-      : channel.assertExchange(this._name, this._type, this._options as AMQPLib.Options.AssertExchange);
+      : channel.assertExchange(this._name, this._type || "", this._options as _Options.AssertExchange);
 
     return new Promise((resolve, reject) => {
       initializeExchange
-        .then((ok) => resolve(ok as IInitializeResult))
+        .then((ok) => resolve(ok as InitializeResult))
         .catch((err) => {
           log("error", `Failed to create exchange '${this._name}'.`);
           delete this._connection._exchanges[this._name];
@@ -199,11 +200,11 @@ export class Exchange extends AbstractNode {
 // =============================================================================
 //  Interface/Types
 // =============================================================================
-export interface IExchangeOptions extends IOptions {
+export interface ExchangeOptions extends Options {
   internal?: boolean;
   alternateExchange?: string;
 }
 
-export interface IInitializeResult {
+export interface InitializeResult {
   exchange: string;
 }

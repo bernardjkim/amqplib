@@ -1,18 +1,16 @@
-import AMQPLib from "amqplib";
-
-import { Binding } from "./Binding";
+import { Channel as _Channel } from "amqplib";
 import { Connection } from "./Connection";
 
-export interface INode {
+export interface Node {
   // ===========================================================================
   //  Fields
   // ===========================================================================
   initialized: Promise<any>;
 
   _connection: Connection;
-  _channel: AMQPLib.Channel;
+  _channel: _Channel;
   _name: string;
-  _options: IOptions;
+  _options: Options;
 
   _deleting: Promise<any>;
   _closing: Promise<void>;
@@ -37,7 +35,7 @@ export interface INode {
   close(): Promise<void>;
 }
 
-export interface IOptions {
+export interface Options {
   durable?: boolean;
   autoDelete?: boolean;
   arguments?: any;

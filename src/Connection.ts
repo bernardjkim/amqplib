@@ -1,8 +1,8 @@
-import AMQPLib from "amqplib";
-import winston from "winston";
+import { connect, Connection as _Connection } from "amqplib";
+import * as winston from "winston";
 import { Binding } from "./Binding";
-import { Exchange, IExchangeOptions } from "./Exchange";
-import { IQueueOptions, Queue } from "./Queue";
+import { Exchange, ExchangeOptions } from "./Exchange";
+import { Queue, QueueOptions } from "./Queue";
 
 // create a custom winston logger for amqp-ts
 const amqpLog = winston.createLogger({
@@ -18,28 +18,28 @@ export class Connection {
   //  Fields
   // ===========================================================================
 
-  public initialized: Promise<void>;
+  initialized!: Promise<void>;
 
-  public _connection: AMQPLib.Connection;
-  public _rebuilding: boolean = false;
-  public _isClosing: boolean = false;
+  _connection!: _Connection;
+  _rebuilding = false;
+  _isClosing = false;
 
-  public _exchanges: { [id: string]: Exchange };
-  public _queues: { [id: string]: Queue };
-  public _bindings: { [id: string]: Binding };
+  _exchanges: { [id: string]: Exchange };
+  _queues: { [id: string]: Queue };
+  _bindings: { [id: string]: Binding };
 
   private url: string;
   private socketOptions: any;
-  private reconnectStrategy: IReconnectStrategy;
+  private reconnectStrategy: ReconnectStrategy;
 
   // ===========================================================================
   //  Constructor
   // ===========================================================================
 
   constructor(
-    url: string = "amqp://localhost:5672",
+    url = "amqp://localhost:5672",
     socketOptions: any = {},
-    reconnectStrategy: IReconnectStrategy = { retries: 0, interval: 1500 }
+    reconnectStrategy: ReconnectStrategy = { retries: 0, interval: 1500 }
   ) {
     this.url = url;
     this.socketOptions = socketOptions;
@@ -62,7 +62,7 @@ export class Connection {
    * @param options - Exchange options
    * @returns Declared Exchange
    */
-  public declareExchange(name: string, type?: string, options?: IExchangeOptions): Exchange {
+  declareExchange(name: string, type?: string, options?: ExchangeOptions): Exchange {
     let exchange = this._exchanges[name];
     if (exchange === undefined) {
       exchange = new Exchange(this, name, type, options);
@@ -76,7 +76,7 @@ export class Connection {
    * @param options - Queue options
    * @returns Declared Queue
    */
-  public declareQueue(name: string, options?: IQueueOptions): Queue {
+  declareQueue(name: string, options?: QueueOptions): Queue {
     let queue = this._queues[name];
     if (queue === undefined) {
       queue = new Queue(this, name, options);
@@ -89,7 +89,7 @@ export class Connection {
    * @param topology Connection topology
    * @returns Promise that fullfils after all Exchanges, Queues, & Bindings have been initialized.
    */
-  public declareTopology(topology: ITopology): Promise<any> {
+  declareTopology(topology: Topology): Promise<any> {
     const promises: Array<Promise<any>> = [];
     let i: number;
     let len: number;
@@ -113,10 +113,13 @@ export class Connection {
         let destination: Queue | Exchange;
         if (binding.exchange !== undefined) {
           destination = this.declareExchange(binding.exchange);
-        } else {
+          promises.push(destination.bind(source, binding.pattern, binding.args));
+        } else if (binding.queue !== undefined) {
           destination = this.declareQueue(binding.queue);
+          promises.push(destination.bind(source, binding.pattern, binding.args));
+        } else {
+          throw new Error("Binding should have either exchange or queue defined");
         }
-        promises.push(destination.bind(source, binding.pattern, binding.args));
       }
     }
     return Promise.all(promises);
@@ -126,7 +129,7 @@ export class Connection {
    * Make sure the whole defined connection topology is configured:
    * @returns Promise that fulfills after all defined exchanges, queues and bindings are initialized
    */
-  public completeConfiguration(): Promise<any> {
+  completeConfiguration(): Promise<any> {
     const promises: Array<Promise<any>> = [];
     for (const exchangeId of Object.keys(this._exchanges)) {
       const exchange: Exchange = this._exchanges[exchangeId];
@@ -150,7 +153,7 @@ export class Connection {
    * Delete the whole defined connection topology:
    * @returns Promise that fulfills after all defined exchanges, queues and bindings have been removed
    */
-  public deleteConfiguration(): Promise<any> {
+  deleteConfiguration(): Promise<any> {
     const promises: Array<Promise<any>> = [];
     for (const bindingId of Object.keys(this._bindings)) {
       const binding: Binding = this._bindings[bindingId];
@@ -174,7 +177,7 @@ export class Connection {
    * Close connection to message broker service.
    * @returns Promise that fulfills after connection is closed
    */
-  public async close(): Promise<void> {
+  async close(): Promise<void> {
     this._isClosing = true;
     return this.initialized.then(() => this._connection.close());
   }
@@ -184,7 +187,7 @@ export class Connection {
    * @param err - Error object
    * @returns Promise that fulfills after the topology has been rebuilt.
    */
-  public _rebuildAll(err: Error): Promise<void> {
+  _rebuildAll(err: Error): Promise<void> {
     log("warn", "Connection error: " + err.message);
 
     log("debug", "Rebuilding connection NOW.");
@@ -219,7 +222,7 @@ export class Connection {
       this.completeConfiguration().then(
         () => {
           log("debug", "Rebuild success.");
-          resolve(null);
+          resolve();
         } /* istanbul ignore next */,
         (rejectReason) => {
           log("debug", "Rebuild failed.");
@@ -258,9 +261,12 @@ export class Connection {
    * @param retry - Number of retry attempts
    * @returns Promise that fulfills once the connection has been initialized.
    */
-  private tryToConnect(retry: number = 0): Promise<void> {
+  private tryToConnect(retry = 0): Promise<void> {
     return new Promise(async (resolve, reject) => {
-      AMQPLib.connect(this.url, this.socketOptions)
+      connect(
+        this.url,
+        this.socketOptions
+      )
         .then((connection) => this.attachEventListeners(connection))
         .then((connection) => (this._connection = connection))
         .then(() => resolve())
@@ -275,7 +281,7 @@ export class Connection {
    * @param connection - AMPQ Connection instance
    * @returns The provided connection after attaching the event listeners.
    */
-  private attachEventListeners(connection: AMQPLib.Connection): AMQPLib.Connection {
+  private attachEventListeners(connection: _Connection): _Connection {
     /**
      * Handler function that is triggered by connection error events.
      * @param err - Connection error
@@ -337,7 +343,7 @@ export class Connection {
  * to connection to the message broker as well as the time interval between
  * each retry attempt.
  */
-export interface IReconnectStrategy {
+export interface ReconnectStrategy {
   retries: number; // number of retries, 0 is forever
   interval: number; // retry interval in ms
 }
@@ -346,7 +352,7 @@ export interface IReconnectStrategy {
  * A Topology defines the set of Exchanges, Queues, and Bindings that exist
  * in this Connection.
  */
-export interface ITopology {
+export interface Topology {
   exchanges: Array<{ name: string; type?: string; options?: any }>;
   queues: Array<{ name: string; options?: any }>;
   bindings: Array<{ source: string; queue?: string; exchange?: string; pattern?: string; args?: any }>;

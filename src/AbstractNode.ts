@@ -1,26 +1,27 @@
-import AMQPLib from "amqplib";
+import { Channel } from "amqplib";
 
 import { Connection } from "./Connection";
-import { INode, IOptions } from "./INode";
+import { Node, Options } from "./Node";
 
-export abstract class AbstractNode implements INode {
+export abstract class AbstractNode implements Node {
   // ===========================================================================
   //  Fields
   // ===========================================================================
-  public initialized: Promise<any>;
 
-  public _connection: Connection;
-  public _channel: AMQPLib.Channel;
-  public _name: string;
-  public _options: IOptions;
+  initialized!: Promise<any>;
 
-  public _deleting: Promise<any>;
-  public _closing: Promise<void>;
+  _connection!: Connection;
+  _name!: string;
+  _options!: Options;
+
+  _channel!: Channel;
+  _deleting!: Promise<any>;
+  _closing!: Promise<void>;
 
   // ===========================================================================
   //  Constructor
   // ===========================================================================
-  constructor(connection: Connection, name: string, options: IOptions = {}) {
+  constructor(connection: Connection, name: string, options: Options = {}) {
     this._connection = connection;
     this._name = name;
     this._options = options;
@@ -33,15 +34,15 @@ export abstract class AbstractNode implements INode {
   /**
    * Initialize node.
    */
-  public abstract _initialize(): void;
+  abstract _initialize(): void;
 
   /**
    * Delete this node.
    */
-  public abstract delete(): Promise<any>;
+  abstract delete(): Promise<any>;
 
   /**
    * Close this queue.
    */
-  public abstract close(): Promise<void>;
+  abstract close(): Promise<void>;
 }

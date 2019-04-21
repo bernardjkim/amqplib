@@ -1,8 +1,7 @@
-import AMQPLib from "amqplib";
-import winston from "winston";
+import { Channel as _Channel, Message as _Message } from "amqplib";
+import * as winston from "winston";
 
-import { INode } from "./INode";
-// import { Exchange } from "./Exchange";
+import { Node } from "./Node";
 import { Queue } from "./Queue";
 
 // create a custom winston logger for amqp-ts
@@ -18,12 +17,12 @@ export class Message {
   // ===========================================================================
   //  Fields
   // ===========================================================================
-  public content: Buffer;
-  public fields: any;
-  public properties: any;
+  content!: Buffer;
+  fields: any;
+  properties: any;
 
-  public _channel: AMQPLib.Channel; // for received messages only: the channel it has been received on
-  public _message: AMQPLib.Message; // received messages only: original amqplib message
+  _channel!: _Channel; // for received messages only: the channel it has been received on
+  _message!: _Message; // received messages only: original amqplib message
 
   // ===========================================================================
   //  Constructor
@@ -44,7 +43,7 @@ export class Message {
    * Set the content of the message.
    * @param content - Message content
    */
-  public setContent(content: any): void {
+  setContent(content: any): void {
     if (typeof content === "string") {
       this.content = Buffer.from(content);
     } else if (!(content instanceof Buffer)) {
@@ -59,7 +58,7 @@ export class Message {
    * Get the content of the message.
    * @returns The content of the message.
    */
-  public getContent(): any {
+  getContent(): any {
     let content = this.content.toString();
     if (this.properties.contentType === "application/json") {
       content = JSON.parse(content);
@@ -72,7 +71,7 @@ export class Message {
    * @param destination - Where the message will be sent
    * @param routingKey  - The message routing key
    */
-  public sendTo(destination: INode, routingKey: string = ""): void {
+  sendTo(destination: Node, routingKey = ""): void {
     // inline function to send the message
     const sendMessage = () => {
       try {
@@ -108,7 +107,7 @@ export class Message {
    *                  the given message shall be considered acknowledged.
    *                  Defaults to **false**
    */
-  public ack(allUpTo?: boolean): void {
+  ack(allUpTo?: boolean): void {
     if (this._channel !== undefined) {
       this._channel.ack(this._message, allUpTo);
     }
@@ -122,7 +121,7 @@ export class Message {
    *                  the queue or queues from which they came. Defaults to
    *                  **true**
    */
-  public nack(allUpTo?: boolean, requeue?: boolean): void {
+  nack(allUpTo?: boolean, requeue?: boolean): void {
     if (this._channel !== undefined) {
       this._channel.nack(this._message, allUpTo, requeue);
     }

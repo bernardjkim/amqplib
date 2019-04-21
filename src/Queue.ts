@@ -1,12 +1,18 @@
-import AMQPLib, { Replies } from "amqplib";
+import {
+  Channel as _Channel,
+  ConsumeMessage as _ConsumeMessage,
+  Message as _Message,
+  Options as _Options,
+  Replies as _Replies
+} from "amqplib";
 import * as Bluebird from "bluebird";
-import winston from "winston";
+import * as winston from "winston";
 
 import { AbstractNode } from "./AbstractNode";
 import { Binding } from "./Binding";
 import { Connection } from "./Connection";
-import { INode, IOptions } from "./INode";
 import { Message } from "./Message";
+import { Node, Options } from "./Node";
 
 // create a custom winston logger for amqp-ts
 const amqpLog = winston.createLogger({
@@ -21,17 +27,17 @@ export class Queue extends AbstractNode {
   // ===========================================================================
   //  Fields
   // ===========================================================================
-  public _consumer: Consumer;
-  public _consumerOptions: AMQPLib.Options.Consume;
-  public _consumerTag: string;
-  public _consumerInitialized: Promise<IConsumerResult>;
-  public _consumerStopping: boolean;
+  _consumer!: Consumer;
+  _consumerOptions!: _Options.Consume;
+  _consumerTag!: string;
+  _consumerInitialized!: Promise<ConsumerResult>;
+  _consumerStopping!: boolean;
 
   // ===========================================================================
   //  Constructor
   // ===========================================================================
-  constructor(connection: Connection, name: string, options: IQueueOptions = {}) {
-    super(connection, name, options as IQueueOptions);
+  constructor(connection: Connection, name: string, options: QueueOptions = {}) {
+    super(connection, name, options as QueueOptions);
     this._connection._queues[this._name] = this;
     this._initialize();
   }
@@ -43,7 +49,7 @@ export class Queue extends AbstractNode {
   /**
    * Initialize queue.
    */
-  public _initialize(): void {
+  _initialize(): void {
     this.initialized = this._connection.initialized
       .then(() => this._connection._connection.createChannel())
       .then((channel) => this.createQueue(channel));
@@ -53,10 +59,10 @@ export class Queue extends AbstractNode {
    * Set the prefetch count for this channel.
    * @param count - Number of messages to prefetch
    */
-  public prefetch(count: number): void {
+  prefetch(count: number): void {
     this.initialized.then(() => {
       this._channel.prefetch(count);
-      (this._options as IQueueOptions).prefetch = count;
+      (this._options as QueueOptions).prefetch = count;
     });
   }
 
@@ -64,7 +70,7 @@ export class Queue extends AbstractNode {
    * Requeue unacknowledged messages on this channel.
    * @returns Promise that fulfills once all messages have been requeued.
    */
-  public async recover(): Promise<Replies.Empty> {
+  async recover(): Promise<_Replies.Empty> {
     return this.initialized.then(() => this._channel.recover());
   }
 
@@ -73,7 +79,7 @@ export class Queue extends AbstractNode {
    * @param onMessage - Consumer function
    * @param options   - Consumer options
    */
-  public activateConsumer(onMessage: Consumer, options: AMQPLib.Options.Consume = {}): Promise<IConsumerResult> {
+  activateConsumer(onMessage: Consumer, options: _Options.Consume = {}): Promise<ConsumerResult> {
     if (!this._consumerInitialized) {
       this._consumerOptions = options;
       this._consumer = onMessage;
@@ -85,7 +91,7 @@ export class Queue extends AbstractNode {
   /**
    * Initialize consumer
    */
-  public _initializeConsumer(): void {
+  _initializeConsumer(): void {
     this._consumerInitialized = this.initialized
       .then(() => {
         return this._channel.consume(this._name, this.wrapConsumer, this._consumerOptions);
@@ -99,7 +105,7 @@ export class Queue extends AbstractNode {
   /**
    * Stop consumer.
    */
-  public async stopConsumer(): Promise<void> {
+  async stopConsumer(): Promise<void> {
     if (!this._consumerInitialized || this._consumerStopping) {
       return Promise.resolve();
     }
@@ -113,7 +119,7 @@ export class Queue extends AbstractNode {
   /**
    * Delete this queue.
    */
-  public delete(): Promise<IDeleteResult> {
+  delete(): Promise<DeleteResult> {
     if (this._deleting === undefined) {
       this._closing = this.initialized
         .then(() => Binding.removeBindingsContaining(this))
@@ -129,7 +135,7 @@ export class Queue extends AbstractNode {
   /**
    * Close this queue.
    */
-  public close(): Promise<void> {
+  close(): Promise<void> {
     if (this._closing === undefined) {
       this._closing = this.initialized
         .then(() => Binding.removeBindingsContaining(this))
@@ -147,7 +153,7 @@ export class Queue extends AbstractNode {
    * @param args    - Args
    * @returns Promise that fulfills once the binding has been initialized.
    */
-  public bind(source: INode, pattern = "", args: any = {}): Promise<Binding> {
+  bind(source: Node, pattern = "", args: any = {}): Promise<Binding> {
     const binding = new Binding(this, source, pattern, args);
     return binding.initialized;
   }
@@ -159,7 +165,7 @@ export class Queue extends AbstractNode {
    * @param args    - Args
    * @returns Promise that fulfills once the binding has been deleted.
    */
-  public unbind(source: INode, pattern = "", args: any = {}): Promise<void> {
+  unbind(source: Node, pattern = "", args: any = {}): Promise<void> {
     return this._connection._bindings[Binding.id(this, source, pattern)].delete();
   }
 
@@ -172,20 +178,20 @@ export class Queue extends AbstractNode {
    * @param channel - AMQPlib Channel instance.
    * @returns Promise that fulfills once the queue has been initialized
    */
-  private createQueue(channel: AMQPLib.Channel): Promise<IInitializeQueueResult> {
+  private createQueue(channel: _Channel): Promise<InitializeQueueResult> {
     this._channel = channel;
 
-    const initializeQueue: Bluebird<Replies.AssertQueue> = this._options.noCreate
+    const initializeQueue: Bluebird<_Replies.AssertQueue> = this._options.noCreate
       ? channel.checkQueue(this._name)
       : channel.assertQueue(this._name);
 
     return new Promise((resolve, reject) => {
       initializeQueue
         .then((ok) => {
-          if ((this._options as IQueueOptions).prefetch) {
-            channel.prefetch((this._options as IQueueOptions).prefetch);
+          if ((this._options as QueueOptions).prefetch) {
+            channel.prefetch((this._options as QueueOptions).prefetch || 0);
           }
-          resolve(ok as IInitializeQueueResult);
+          resolve(ok as InitializeQueueResult);
         })
         .catch((err) => {
           log("error", `Failed to create queue '${this._name}'.`);
@@ -199,7 +205,8 @@ export class Queue extends AbstractNode {
    * Activate consumer wrapper.
    * @param msg - AMQPlib message
    */
-  private wrapConsumer = async (msg: AMQPLib.Message) => {
+  private wrapConsumer = async (msg: _ConsumeMessage | null) => {
+    if (!msg) return;
     // init Message
     const message = new Message(msg.content, msg.properties, msg.fields);
     message._message = msg;
@@ -220,7 +227,7 @@ export class Queue extends AbstractNode {
       const { replyTo, correlationId } = msg.properties;
       this.replyToQueue(await result, replyTo, correlationId);
     }
-  }
+  };
 
   /**
    * Send the response to the specified replyTo queue.
@@ -263,7 +270,7 @@ export class Queue extends AbstractNode {
 // =============================================================================
 //  Interface/Types
 // =============================================================================
-export interface IQueueOptions extends IOptions {
+export interface QueueOptions extends Options {
   exclusive?: boolean;
   messageTtl?: number;
   expires?: number;
@@ -271,16 +278,16 @@ export interface IQueueOptions extends IOptions {
   maxLength?: number;
   prefetch?: number;
 }
-export type Consumer = (msg: Message, channel?: AMQPLib.Channel) => any;
+export type Consumer = (msg: Message, channel?: _Channel) => any;
 
-export interface IConsumerResult {
+export interface ConsumerResult {
   consumerTag: string;
 }
-export interface IInitializeQueueResult {
+export interface InitializeQueueResult {
   queue: string;
   messageCount: number;
   consumerCount: number;
 }
-export interface IDeleteResult {
+export interface DeleteResult {
   messageCount: number;
 }

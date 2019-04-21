@@ -1,8 +1,8 @@
-import winston from "winston";
+import * as winston from "winston";
 
 import { Replies } from "amqplib";
 import { Exchange } from "./Exchange";
-import { INode } from "./INode";
+import { Node } from "./Node";
 import { Queue } from "./Queue";
 
 // create a custom winston logger for amqp-ts
@@ -25,7 +25,7 @@ export class Binding {
    * @param pattern     - Routing pattern
    * @returns Binding id.
    */
-  public static id(destination: INode, source: INode, pattern: string = ""): string {
+  static id(destination: Node, source: Node, pattern = ""): string {
     const srcString = source._name;
     const dstString = destination._name;
     const typeString = destination instanceof Queue ? "Queue" : "Exchange";
@@ -37,7 +37,7 @@ export class Binding {
    * @param connectionPoint - MQ node
    * @returns Promise that fulfills once all bindings are removed.
    */
-  public static removeBindingsContaining(connectionPoint: INode): Promise<any> {
+  static removeBindingsContaining(connectionPoint: Node): Promise<any> {
     const connection = connectionPoint._connection;
     const promises: Array<Promise<void>> = [];
     for (const bindingId of Object.keys(connection._bindings)) {
@@ -52,17 +52,17 @@ export class Binding {
   // ===========================================================================
   //  Fields
   // ===========================================================================
-  public initialized: Promise<Binding>;
+  initialized!: Promise<Binding>;
 
-  public _source: Exchange;
-  public _destination: INode;
-  public _pattern: string;
-  public _args: any;
+  _source: Exchange;
+  _destination: Node;
+  _pattern: string;
+  _args: any;
 
   // ===========================================================================
   //  Constructor
   // ===========================================================================
-  constructor(destination: INode, source: INode, pattern = "", args: any = {}) {
+  constructor(destination: Node, source: Node, pattern = "", args: any = {}) {
     if (!(source instanceof Exchange)) {
       throw new Error("Source node must be an Exchange.");
     }
@@ -81,7 +81,7 @@ export class Binding {
   /**
    * Initialize binding.
    */
-  public _initialize(): void {
+  _initialize(): void {
     const srcName = this._source._name;
     const dstName = this._destination._name;
 
@@ -115,7 +115,7 @@ export class Binding {
    * Delete binding.
    * @returns Promise that fulfills once binding has been deleted.
    */
-  public async delete(): Promise<void> {
+  async delete(): Promise<void> {
     const srcName = this._source._name;
     const dstName = this._destination._name;
 

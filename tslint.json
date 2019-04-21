@@ -1,10 +1,14 @@
 {
-  "defaultSeverity": "error",
-  "extends": ["tslint:recommended"],
-  "jsRules": {},
+  "extends": "gts/tslint.json",
   "rules": {
-    "trailing-comma": [false],
-    "variable-name": ["allow-leading-underscore"]
-  },
-  "rulesDirectory": []
+    "max-line-length": [true, 120],
+    "ordered-imports": [
+      true,
+      {
+        "import-sources-order": "lowercase-last",
+        "named-imports-order": "lowercase-first"
+      }
+    ],
+    "no-any": false
+  }
 }
