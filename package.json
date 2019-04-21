@@ -2,8 +2,8 @@
   "name": "@bernardjkim/amqplib",
   "version": "1.0.12",
   "description": "amqplib wrapper",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
   "dependencies": {
     "@types/amqplib": "^0.5.11",
     "@types/uuid": "^3.4.4",
